@@ -5,56 +5,53 @@ public class GravityController : MonoBehaviour
 
     Transform objectTransform;
     [SerializeField] Vector3 velocity;
-    [SerializeField] Vector3 gravityDirection;
+    [SerializeField] Vector3 gravityForce;
+    [SerializeField] public float mass;
+    [SerializeField] Vector3 tangentialVelocityForOrbit;
 
 
     // Start is called before the first frame update
     void Start()
     {
         objectTransform = GetComponent<Transform>();
-        velocity = Vector3.zero;
-        gravityDirection = new(0, -0.01f, 0);
     }
 
     // Update is called once per frame
     void Update()
     {
-        SetGravity();
+        SetGravityForce();
 
         // Apply the gravity to the object
-        ApplyGravity(gravityDirection);
+        ApplyGravity(gravityForce);
 
         MoveObject(velocity);
     }
 
-    void SetGravity()
+    void SetGravityForce()
     {
-        // Set the gravity direction based on this world position
-        gravityDirection = (GetWorldSpaceMouseWorldPos() - objectTransform.position) / 150f;
-    }
+        gravityForce = Vector3.zero;
 
-    Vector3 GetWorldSpaceMouseWorldPos()
-    {
-        // Create a ray from the camera through the mouse position
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        // Get all objects with the tag of GravitySource
+        GameObject[] gravitySources = GameObject.FindGameObjectsWithTag("GravitySource");
 
-        // Create a plane at y = 0, assuming the normal of the plane is facing towards the camera
-        Plane plane = new(Vector3.up, new Vector3(0, 0, 0));
-
-        // Variable to store the distance along the ray where it intersects the plane
-        float enter;
-
-        // Check if the ray hits the plane
-        if (plane.Raycast(ray, out enter))
+        foreach (GameObject gravitySource in gravitySources)
         {
-            //Get the point that is clicked
-            Vector3 hitPoint = ray.GetPoint(enter);
-            return hitPoint;
-        }
-        else
-        {
-            // Return zero vector if there is no intersection
-            return Vector3.zero;
+            // Check if game object is this object
+            if (gravitySource == gameObject)
+            {
+                continue;
+            }
+            Vector3 gravityDirection = (gravitySource.transform.position - objectTransform.position).normalized;
+            float distance = Vector3.Distance(gravitySource.transform.position, objectTransform.position);
+            float gravityMagnitude = gravitySource.GetComponent<GravityController>().mass * mass / Mathf.Max(distance * distance, 0.1f);
+
+            gravityForce += gravityDirection * gravityMagnitude / 100f;
+
+            if (gravitySource.GetComponent<GravityController>().mass > 100)
+            {
+                Vector3 tangentialDirection = Vector3.Cross(gravityDirection, Vector3.up);
+                tangentialVelocityForOrbit = tangentialDirection.normalized * Mathf.Sqrt(gravityForce.magnitude * distance);
+            }
         }
     }
 
@@ -62,7 +59,7 @@ public class GravityController : MonoBehaviour
     void ApplyGravity(Vector3 gravity)
     {
         // Apply the gravity to the object
-        velocity += gravity;
+        velocity += gravity / mass;
     }
 
     void MoveObject(Vector3 velocity)
